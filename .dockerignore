@@ -1,0 +1,156 @@
+# ---------------------------------------------------------------------------
+# Haydeén Sistema - .dockerignore
+# El proyecto no requiere Docker; este archivo existe para mantener imágenes
+# de desarrollo o pruebas pequeñas, sin secretos ni artefactos innecesarios.
+# ---------------------------------------------------------------------------
+
+# --- Control de versiones y metadatos -------------------------------------
+.git/
+.gitignore
+.gitattributes
+.github/
+.gitlab-ci.yml
+.dockerignore
+
+# --- Secretos y configuración local ---------------------------------------
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.jks
+secrets/
+credentials*
+config.local.*
+
+# --- Entornos virtuales y cachés de Python --------------------------------
+.venv/
+**/.venv/
+venv/
+**/venv/
+env/
+**/env/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# --- Node y frontend -------------------------------------------------------
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-store/
+.vite/
+.parcel-cache/
+web/dist/
+test-results/
+playwright-report/
+playwright/.cache/
+
+# --- Artefactos de build y empaquetado ------------------------------------
+build/
+dist/
+*.spec
+!packaging/*.spec
+*.exe
+*.msi
+*.app
+*.dmg
+*.pkg
+*.zip
+*.7z
+*.rar
+installer/
+output/
+packaging/build/
+packaging/dist/
+packaging/output/
+
+# --- Base de datos, volcados y respaldos ----------------------------------
+*.sql.gz
+*.sql.zip
+*.dump
+*.bak
+*.backup
+dumps/
+backups/
+mysql-data/
+data/
+!database/schema.sql
+!database/demo_data.sql
+
+# --- Logs y temporales -----------------------------------------------------
+*.log
+logs/
+log/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+*.pid
+core
+core.*
+crash.log
+
+# --- Sesiones y cachés de la aplicación -----------------------------------
+api/sesiones*
+desktop/sesiones*
+*.session
+*.sess
+.cache/
+tmp/
+temp/
+.cookie*
+cookies.txt
+
+# --- Documentación y ejemplos innecesarios en la imagen -------------------
+docs/
+README.md
+CONTRIBUTING.md
+SECURITY.md
+SECURITY_CHECKLIST.md
+NOTICE
+LICENSE
+*.md
+
+# --- Editores, IDE y sistema operativo ------------------------------------
+.idea/
+.vscode/
+*.iml
+*.suo
+*.user
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# --- Reportes de seguridad y auditoría ------------------------------------
+.gitleaks/
+trufflehog-report*
+*.sarif
+dependency-check-report.*
+pip-audit-report.*
+audit.json
+
+# --- Archivos temporales de ofimática -------------------------------------
+*.docx
+*.xlsx
+*.pptx
+~$*

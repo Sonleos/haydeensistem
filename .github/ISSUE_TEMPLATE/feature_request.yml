@@ -1,0 +1,67 @@
+name: Propuesta de mejora
+description: Nueva funcionalidad o mejora de una existente.
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Antes de proponer, revisa el roadmap del README y los issues abiertos.
+        No incluyas datos reales de pacientes ni secretos.
+
+  - type: textarea
+    id: problema
+    attributes:
+      label: Problema u oportunidad
+      description: Qué necesidad cubre esta propuesta y a quién afecta.
+    validations:
+      required: true
+
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Propuesta
+      description: Describe la solución esperada, no solo la implementación.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: modulo
+    attributes:
+      label: Módulo
+      options:
+        - Pacientes
+        - Personal y turnos
+        - Inventario
+        - Tratamientos
+        - Control diario
+        - Autenticación y permisos
+        - Infraestructura / scripts
+        - Documentación
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas consideradas
+    validations:
+      required: false
+
+  - type: textarea
+    id: impacto
+    attributes:
+      label: Impacto técnico y clínico
+      description: ¿Requiere migración, cambio de permisos o validación clínica?
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirmaciones
+    attributes:
+      label: Confirmaciones
+      options:
+        - label: La propuesta no incluye datos reales ni información sensible.
+          required: true
+        - label: Revisé que no exista una propuesta duplicada.
+          required: true

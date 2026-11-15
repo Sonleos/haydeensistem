@@ -1,0 +1,59 @@
+Haydeén Sistema
+Copyright (c) 2026 [NOMBRE DEL TITULAR O ENTIDAD]
+
+Este producto se distribuye bajo la licencia MIT. Consulta el archivo LICENSE.
+
+--------------------------------------------------------------------------------
+AVISO MÉDICO Y DE RESPONSABILIDAD
+--------------------------------------------------------------------------------
+
+Haydeén Sistema es una herramienta de apoyo administrativo y de registro de
+información. NO es un dispositivo médico, NO emite diagnósticos, NO prescribe
+tratamientos y NO sustituye el juicio clínico de profesionales sanitarios
+cualificados.
+
+El uso del software no exime al titular, al operador ni a la institución que lo
+despliega de:
+
+  - La obligación de validar clínicamente los flujos, cálculos y registros.
+  - El cumplimiento de la normativa sanitaria, de protección de datos y de
+    historia clínica aplicable en su jurisdicción.
+  - La obtención de consentimientos, autorizaciones y evaluaciones de impacto.
+  - La verificación independiente de dosis, horarios, identificación de
+    pacientes y administración de medicamentos.
+  - La responsabilidad derivada de dolo, negligencia grave o incumplimiento
+    normativo, que ninguna licencia puede excluir.
+
+La licencia MIT limita la responsabilidad civil sobre el software, pero no
+sustituye las obligaciones legales y sanitarias del responsable del tratamiento
+ni protege frente a negligencia profesional.
+
+Los datos incluidos en `database/demo_data.sql` y en los seeds exportados son
+sintéticos o anonimizados y tienen fines de demostración. No deben usarse con
+información real de pacientes.
+
+--------------------------------------------------------------------------------
+COMPONENTES DE TERCEROS
+--------------------------------------------------------------------------------
+
+Este producto utiliza, entre otros, los siguientes componentes. Cada uno se
+distribuye bajo su propia licencia y conserva sus propios avisos de copyright:
+
+  - FastAPI (MIT) - https://github.com/fastapi/fastapi
+  - Uvicorn (BSD-3-Clause) - https://github.com/encode/uvicorn
+  - PyMySQL (MIT) - https://github.com/PyMySQL/PyMySQL
+  - python-dotenv (BSD-3-Clause) - https://github.com/theskumar/python-dotenv
+  - cryptography (Apache-2.0 / BSD-3-Clause) - https://github.com/pyca/cryptography
+  - CustomTkinter (MIT) - https://github.com/TomSchimansky/CustomTkinter
+  - Requests (Apache-2.0) - https://github.com/psf/requests
+  - Pillow (MIT-CMU) - https://github.com/python-pillow/Pillow
+  - Tailwind CSS (MIT) - https://github.com/tailwindlabs/tailwindcss
+  - MySQL (GPLv2 con excepciones / licencia comercial) -
+    https://www.mysql.com/about/legal/licensing/
+
+Las marcas, logotipos y nombres comerciales pertenecen a sus respectivos
+titulares. La licencia MIT no concede permiso para usar dichas marcas.
+
+--------------------------------------------------------------------------------
+
+Conserva este archivo junto con LICENSE al distribuir el software.

@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" role="img" aria-labelledby="title desc">
+  <title id="title">Placeholder: modal de signos vitales en la app móvil</title>
+  <desc id="desc">Maqueta ilustrativa del formulario de signos vitales de Haydeén Sistema con campos de temperatura, frecuencia cardiaca, saturación y presión arterial. Datos sintéticos.</desc>
+  <defs>
+    <linearGradient id="mh4" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#1E40AF"/>
+    </linearGradient>
+    <filter id="ms4" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.10"/>
+    </filter>
+    <clipPath id="screen4">
+      <rect width="390" height="844" rx="30"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#screen4)">
+    <rect width="390" height="844" fill="#F1F5F9"/>
+
+    <!-- Dimmed background -->
+    <rect width="390" height="200" fill="url(#mh4)" opacity="0.35"/>
+    <text x="24" y="86" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#FFFFFF" opacity="0.6">Control diario</text>
+    <rect x="24" y="110" width="342" height="60" rx="14" fill="#FFFFFF" opacity="0.5"/>
+    <rect x="24" y="186" width="342" height="60" rx="14" fill="#FFFFFF" opacity="0.4"/>
+
+    <!-- Sheet -->
+    <rect x="0" y="160" width="390" height="684" rx="26" fill="#FFFFFF"/>
+    <rect x="165" y="174" width="60" height="5" rx="2.5" fill="#CBD5E1"/>
+
+    <text x="24" y="216" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="700" fill="#0F172A">Signos vitales</text>
+    <text x="366" y="216" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="600" fill="#94A3B8" text-anchor="end">✕</text>
+
+    <rect x="24" y="230" width="342" height="44" rx="12" fill="#EFF6FF"/>
+    <circle cx="48" cy="252" r="12" fill="#DBEAFE"/>
+    <text x="48" y="256" font-family="Segoe UI, Arial, sans-serif" font-size="9" font-weight="700" fill="#1D4ED8" text-anchor="middle">MG</text>
+    <text x="68" y="248" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" fill="#0F172A">María González R.</text>
+    <text x="68" y="264" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#64748B">A-102 · 12 nov 2026 · 09:41</text>
+
+    <!-- Fields grid -->
+    <g font-family="Segoe UI, Arial, sans-serif">
+      <text x="24" y="300" font-size="10" font-weight="700" fill="#64748B">TEMPERATURA (°C)</text>
+      <rect x="24" y="308" width="165" height="48" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <text x="38" y="339" font-size="15" font-weight="700" fill="#0F172A">36.5</text>
+
+      <text x="201" y="300" font-size="10" font-weight="700" fill="#64748B">FRECUENCIA CARDIACA</text>
+      <rect x="201" y="308" width="165" height="48" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <text x="215" y="339" font-size="15" font-weight="700" fill="#0F172A">78</text>
+      <text x="352" y="339" font-size="10" fill="#94A3B8" text-anchor="end">lpm</text>
+
+      <text x="24" y="382" font-size="10" font-weight="700" fill="#64748B">FRECUENCIA RESPIRATORIA</text>
+      <rect x="24" y="390" width="165" height="48" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <text x="38" y="421" font-size="15" font-weight="700" fill="#0F172A">18</text>
+      <text x="175" y="421" font-size="10" fill="#94A3B8" text-anchor="end">rpm</text>
+
+      <text x="201" y="382" font-size="10" font-weight="700" fill="#64748B">SATURACIÓN O₂</text>
+      <rect x="201" y="390" width="165" height="48" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <text x="215" y="421" font-size="15" font-weight="700" fill="#0F172A">96</text>
+      <text x="352" y="421" font-size="10" fill="#94A3B8" text-anchor="end">%</text>
+
+      <text x="24" y="464" font-size="10" font-weight="700" fill="#64748B">T/A SISTÓLICA</text>
+      <rect x="24" y="472" width="165" height="48" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <text x="38" y="503" font-size="15" font-weight="700" fill="#0F172A">120</text>
+      <text x="175" y="503" font-size="10" fill="#94A3B8" text-anchor="end">mmHg</text>
+
+      <text x="201" y="464" font-size="10" font-weight="700" fill="#64748B">T/A DIASTÓLICA</text>
+      <rect x="201" y="472" width="165" height="48" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <text x="215" y="503" font-size="15" font-weight="700" fill="#0F172A">80</text>
+      <text x="352" y="503" font-size="10" fill="#94A3B8" text-anchor="end">mmHg</text>
+
+      <text x="24" y="546" font-size="10" font-weight="700" fill="#64748B">GLUCOSA (DXTX)</text>
+      <rect x="24" y="554" width="165" height="48" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <text x="38" y="585" font-size="15" font-weight="700" fill="#94A3B8">Opcional</text>
+
+      <text x="201" y="546" font-size="10" font-weight="700" fill="#64748B">INSULINA (UI)</text>
+      <rect x="201" y="554" width="165" height="48" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <text x="215" y="585" font-size="15" font-weight="700" fill="#94A3B8">Opcional</text>
+
+      <text x="24" y="628" font-size="10" font-weight="700" fill="#64748B">NOTAS</text>
+      <rect x="24" y="636" width="342" height="56" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <text x="38" y="660" font-size="11" fill="#94A3B8">Observaciones del turno…</text>
+    </g>
+
+    <!-- Actions -->
+    <rect x="24" y="708" width="110" height="48" rx="12" fill="#F1F5F9"/>
+    <text x="79" y="737" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#475569" text-anchor="middle">Cancelar</text>
+
+    <rect x="146" y="708" width="220" height="48" rx="12" fill="#2563EB"/>
+    <text x="256" y="737" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">Guardar registro</text>
+
+    <text x="195" y="790" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#94A3B8" text-anchor="middle">Validación de rangos activa</text>
+  </g>
+  <rect x="0.75" y="0.75" width="388.5" height="842.5" rx="30" fill="none" stroke="#CBD5E1" stroke-width="1.5"/>
+</svg>
