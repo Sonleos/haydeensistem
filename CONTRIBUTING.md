@@ -29,16 +29,17 @@ Para cambios grandes, abre primero un issue con la propuesta y el alcance. Así 
 
 Sigue la sección de instalación de [`README.md`](README.md). Resumen:
 
-```powershell
+```cmd
 python -m venv api\.venv
 api\.venv\Scripts\python.exe -m pip install -r api\requirements.txt
 
 python -m venv desktop\.venv
 desktop\.venv\Scripts\python.exe -m pip install -r desktop\requirements.txt
 
-Copy-Item api\.env.example api\.env
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\import_demo.ps1
+api\.venv\Scripts\python.exe scripts\init_db.py
 ```
+
+`init_db.py` crea `api/.env`, la base, el esquema, las migraciones, los datos demo y los usuarios. No actives `.venv` ni uses PowerShell.
 
 No uses datos reales de pacientes en desarrollo. Usa los datos de `database/demo_data.sql` o datos sintéticos.
 
@@ -230,39 +231,29 @@ Closes #<ticket>
 
 ### Verificación rápida
 
-```powershell
-# Sintaxis Python
-python -m py_compile api\main.py api\db.py api\security.py api\config.py desktop\admin_panel.py
+```cmd
+:: Sintaxis Python
+api\.venv\Scripts\python.exe -m py_compile api\main.py api\db.py api\security.py api\config.py scripts\init_db.py scripts\run_api.py scripts\test_sistema.py desktop\admin_panel.py
 
-# Sintaxis JavaScript
+:: Sintaxis JavaScript
 node --check web\js\app.js
 node --check web\js\api.js
 ```
 
-### Smoke test de API
+### Prueba de sistema
 
-Con la API en ejecución:
+Un solo comando verifica BD, API, login, endpoints y RBAC:
 
-```powershell
-$base = "http://127.0.0.1:8000/api"
-$login = Invoke-RestMethod -Uri "$base/auth/login" -Method Post `
-  -ContentType "application/json" `
-  -Body '{"username":"admin","password":"<CLAVE_DEL_SEEDER>"}'
-$headers = @{ Authorization = "Bearer $($login.token)" }
-
-Invoke-RestMethod -Uri "$base/pacientes" -Headers $headers | Out-Null
-Invoke-RestMethod -Uri "$base/personal" -Headers $headers | Out-Null
-Invoke-RestMethod -Uri "$base/inventario" -Headers $headers | Out-Null
-Invoke-RestMethod -Uri "$base/tratamientos" -Headers $headers | Out-Null
-Invoke-RestMethod -Uri "$base/control-diario" -Headers $headers | Out-Null
-
-"Smoke test OK"
+```cmd
+api\.venv\Scripts\python.exe scripts\test_sistema.py
 ```
+
+Si la API no está levantada, el script la inicia en un puerto libre y la detiene al terminar. Crea usuarios temporales y los elimina.
 
 ### Panel de escritorio
 
-1. Inicia la API.
-2. Ejecuta `desktop\.venv\Scripts\python.exe admin_panel.py`.
+1. Inicia la API con `iniciar_api.bat`.
+2. Ejecuta `iniciar_escritorio.bat`.
 3. Inicia sesión y recorre todos los módulos.
 4. Verifica que las tablas carguen filas y que el control diario cambie de pestaña.
 
@@ -275,11 +266,11 @@ Invoke-RestMethod -Uri "$base/control-diario" -Headers $headers | Out-Null
 
 ### Base de datos
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\import_demo.ps1
+```cmd
+api\.venv\Scripts\python.exe scripts\init_db.py
 ```
 
-Verifica que los acentos se conserven (`Martínez`, `Ríos`, `González`) y que no se dupliquen registros al ejecutar dos veces.
+Ejecútalo dos veces y verifica que los acentos se conserven (`Martínez`, `Ríos`, `González`) y que no se dupliquen registros. Para empezar de cero: `init_db.py --reset` (destructivo).
 
 ## Seguridad en contribuciones
 
@@ -294,7 +285,7 @@ Verifica que los acentos se conserven (`Martínez`, `Ríos`, `González`) y que 
 
 Al enviar un pull request aceptas que tu contribución se licencie bajo la **MIT License** del proyecto. Firma tus commits con el [Developer Certificate of Origin](https://developercertificate.org/):
 
-```powershell
+```cmd
 git commit -s -m "feat(web): agregar búsqueda por habitación"
 ```
 

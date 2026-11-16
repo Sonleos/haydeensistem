@@ -1,7 +1,6 @@
 * text=auto eol=lf
 
-# Scripts de Windows: CRLF para compatibilidad con PowerShell 5.1
-*.ps1 text eol=crlf
+# Lanzadores de Windows: CRLF para compatibilidad con cmd.exe
 *.bat text eol=crlf
 *.cmd text eol=crlf
 

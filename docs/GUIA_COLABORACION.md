@@ -6,11 +6,33 @@ Flujo de trabajo para el equipo de desarrollo de Haydeén Sistema.
 
 ## 1. Incorporación al proyecto
 
-1. Instala Laragon, Python 3.10+ y Git.
-2. Clona el repositorio y crea los entornos virtuales (`README.md`, guía rápida).
-3. Copia `api/.env.example` a `api/.env` y genera tu `SECRET_KEY`.
-4. Ejecuta `scripts/import_demo.ps1` para crear esquema, demo y usuarios.
-5. Verifica `scripts/seed_system.py --check` y abre `/docs`.
+1. Instala Laragon con MySQL 8, Python 3.10+ y Git.
+2. Clona el repositorio.
+3. Crea los entornos virtuales (sin activarlos):
+
+```cmd
+python -m venv api\.venv
+api\.venv\Scripts\python.exe -m pip install -r api\requirements.txt
+
+python -m venv desktop\.venv
+desktop\.venv\Scripts\python.exe -m pip install -r desktop\requirements.txt
+```
+
+4. Enciende Laragon y ejecuta la inicialización completa:
+
+```cmd
+api\.venv\Scripts\python.exe scripts\init_db.py
+```
+
+Ese comando crea `api/.env`, la base, el esquema, las migraciones, los datos demo y los usuarios. Anota las contraseñas que muestra una sola vez.
+
+5. Verifica el entorno:
+
+```cmd
+api\.venv\Scripts\python.exe scripts\init_db.py --check
+api\.venv\Scripts\python.exe scripts\test_sistema.py
+```
+
 6. Lee [`ARQUITECTURA_Y_ESTRUCTURA.md`](ARQUITECTURA_Y_ESTRUCTURA.md) y [`BASE_DE_DATOS_Y_API.md`](BASE_DE_DATOS_Y_API.md).
 
 Nunca uses datos reales de pacientes en desarrollo. Usa `database/demo_data.sql` o datos sintéticos.
@@ -68,7 +90,7 @@ db(migration): agregar tabla de auditoría
 
 Firma tus commits con DCO:
 
-```powershell
+```cmd
 git commit -s -m "feat(api): agregar endpoint de logout"
 ```
 
@@ -83,8 +105,10 @@ git commit -s -m "feat(api): agregar endpoint de logout"
 3. No elimines columnas ni tablas con datos sin un plan de migración y respaldo.
 4. Prueba sobre una copia de la base, no sobre la de un compañero.
 5. Actualiza también `schema.sql` para instalaciones nuevas.
-6. Documenta en el PR: SQL ejecutado, impacto, tiempo estimado y plan de reversa.
-7. Actualiza [`BASE_DE_DATOS_Y_API.md`](BASE_DE_DATOS_Y_API.md) si cambian tablas, reglas o endpoints.
+6. Ejecuta `api\.venv\Scripts\python.exe scripts\init_db.py` para aplicar la migración.
+7. Verifica con `--check` y `--list`.
+8. Documenta en el PR: SQL ejecutado, impacto, tiempo estimado y plan de reversa.
+9. Actualiza [`BASE_DE_DATOS_Y_API.md`](BASE_DE_DATOS_Y_API.md) si cambian tablas, reglas o endpoints.
 
 ### Plantilla de migración
 
@@ -104,6 +128,7 @@ SET NAMES utf8mb4;
 
 - `DROP DATABASE` o `TRUNCATE` en migraciones.
 - Credenciales, rutas locales o datos reales en archivos SQL.
+- Ejecutar `schema.sql` sobre una base con datos: usa migraciones.
 - Ejecutar migraciones en producción sin respaldo verificado.
 - Modificar una migración ya aplicada: crea una nueva.
 
@@ -113,6 +138,7 @@ Antes de abrir el PR:
 
 - [ ] Rama actualizada con `dev`.
 - [ ] Cambio probado en API, escritorio y/o móvil según corresponda.
+- [ ] `scripts\test_sistema.py` en verde.
 - [ ] Sin secretos, `.env`, volcados ni datos reales.
 - [ ] Documentación actualizada.
 - [ ] Commits con Conventional Commits y `Signed-off-by`.
@@ -144,21 +170,20 @@ Comentarios: sé específico, propón alternativas y distingue bloqueante de sug
 
 Resumen; el detalle está en [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 
-```powershell
-# Sintaxis
-api\.venv\Scripts\python.exe -m py_compile api\main.py api\db.py api\security.py api\config.py scripts\seed_system.py desktop\admin_panel.py
+```cmd
+:: Sintaxis Python
+api\.venv\Scripts\python.exe -m py_compile api\main.py api\db.py api\security.py api\config.py scripts\init_db.py scripts\run_api.py scripts\test_sistema.py desktop\admin_panel.py
+
+:: Sintaxis JavaScript
 node --check web\js\api.js
 node --check web\js\app.js
 
-# Seeder
-api\.venv\Scripts\python.exe scripts\seed_system.py --check
-api\.venv\Scripts\python.exe scripts\seed_system.py --list
+:: Base de datos y esquema
+api\.venv\Scripts\python.exe scripts\init_db.py --check
+api\.venv\Scripts\python.exe scripts\init_db.py --list
 
-# Smoke test de API
-$login = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/auth/login" -Method Post `
-  -ContentType "application/json" -Body '{"username":"admin","password":"<CLAVE>"}'
-$headers = @{ Authorization = "Bearer $($login.token)" }
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/pacientes" -Headers $headers | Out-Null
+:: Prueba de sistema (BD + API + login + RBAC)
+api\.venv\Scripts\python.exe scripts\test_sistema.py
 ```
 
 Prueba siempre:
@@ -166,15 +191,15 @@ Prueba siempre:
 - Login correcto e incorrecto.
 - Matriz de permisos si cambiaste roles.
 - Registro de signos y administración con descuento de stock.
-- Importación demo dos veces (idempotencia y acentos).
+- Inicialización dos veces (idempotencia y acentos).
 - Export/import de seed en una base limpia.
 
 ## 8. Seguridad en el equipo
 
-- Cada desarrollador usa su propia `SECRET_KEY` local.
+- Cada desarrollador usa su propia `SECRET_KEY` local; `init_db.py` la genera.
 - No compartas `api/.env` por chat ni correo.
 - No subas `database/seeds/*.json`: contiene hashes.
-- Rota contraseñas con `seed_system.py --apply --reset-passwords` si sospechas exposición.
+- Rota contraseñas con `init_db.py --reset-passwords` si sospechas exposición.
 - No desactives `require_permiso()` para “probar rápido”.
 - Reporta vulnerabilidades por el canal privado.
 

@@ -73,7 +73,7 @@ Los plazos son orientativos y pueden variar según la complejidad. Mantendremos 
 - Panel de escritorio CustomTkinter y su cliente HTTP.
 - App móvil: manejo de tokens, XSS, almacenamiento local y lógica de UI.
 - Esquema SQL, consultas, permisos y migraciones.
-- Scripts de PowerShell de importación y arranque.
+- Scripts de Python (`scripts/init_db.py`, `scripts/run_api.py`, `scripts/test_sistema.py`) y lanzadores `.bat` de inicialización, arranque y pruebas.
 - Configuración de ejemplo y documentación de despliegue.
 
 ### Fuera de alcance
@@ -93,7 +93,7 @@ Si actúas de buena fe, respetas la privacidad, no accedes a datos de pacientes 
 
 Antes de usar el sistema con datos reales:
 
-1. **Rota las contraseñas del seeder.** `seed_system.py --apply` genera claves aleatorias; cámbialas antes de usar datos reales con `--reset-passwords`.
+1. **Rota las contraseñas iniciales.** `init_db.py` genera claves aleatorias; cámbialas antes de usar datos reales con `init_db.py --reset-passwords`.
 2. **Revisa la matriz de permisos** en `rol_permisos` y asigna a cada persona el rol mínimo necesario.
 3. **Usa un usuario MySQL dedicado**, no `root`, con permisos mínimos sobre `haydeensistem`.
 4. **Configura `CORS_ORIGINS`** con los orígenes reales; no uses `*`.
@@ -104,7 +104,7 @@ Antes de usar el sistema con datos reales:
 9. **Rota sesiones y contraseñas** si sospechas una exposición.
 10. **Revisa logs** sin incluir datos clínicos, tokens ni contraseñas.
 11. **Mantén dependencias actualizadas** y ejecuta auditorías (`pip-audit`).
-10. **Realiza validación clínica y análisis de riesgos** antes de usar el sistema en decisiones de atención.
+12. **Realiza validación clínica y análisis de riesgos** antes de usar el sistema en decisiones de atención.
 
 Consulta la lista completa en [`SECURITY_CHECKLIST.md`](SECURITY_CHECKLIST.md).
 

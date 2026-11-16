@@ -19,6 +19,7 @@ Web móvil (HTML/JS) ─────┘        │
 - **Dos clientes** consumen la misma API y comparten reglas de negocio.
 - **Sin ORM**: SQL explícito y parametrizado con PyMySQL.
 - **Autorización en el servidor**: los clientes nunca deciden permisos.
+- **Inicialización idempotente** con un único script Python y lanzadores `.bat`.
 
 ## 2. Árbol de directorios
 
@@ -60,9 +61,9 @@ haydeensistem/
 │   └── assets/                   # Recursos estáticos
 │
 ├── scripts/
-│   ├── seed_system.py            # Roles, permisos, usuarios, export/import JSON
-│   ├── import_demo.ps1           # Esquema + demo + seeder (UTF-8 seguro)
-│   └── start_api.ps1             # Arranque local/LAN leyendo api/.env
+│   ├── init_db.py                # Inicialización completa e idempotente
+│   ├── run_api.py                # Arranque de Uvicorn leyendo api/.env
+│   └── test_sistema.py           # Prueba rápida de BD, API, login y RBAC
 │
 ├── docs/
 │   ├── ARQUITECTURA_Y_ESTRUCTURA.md
@@ -81,6 +82,9 @@ haydeensistem/
 │       ├── bug_report.yml
 │       └── feature_request.yml
 │
+├── iniciar_api.bat               # Arranque de la API con doble clic
+├── iniciar_escritorio.bat        # Arranque del panel con doble clic
+├── probar_sistema.bat            # Pruebas con doble clic
 ├── .gitignore                    # Secretos, venv, cachés, logs, dumps, seeds
 ├── .dockerignore                 # Contexto mínimo si se usa Docker
 ├── .gitattributes                # EOL y UTF-8 consistentes
@@ -114,7 +118,25 @@ haydeensistem/
 
 **Riesgo asumido:** no hay migraciones automáticas ni capa de repositorio. La disciplina de SQL y migraciones recae en el equipo (ver [`GUIA_COLABORACION.md`](GUIA_COLABORACION.md)).
 
-### 3.2 Seguridad con PBKDF2 y tokens Bearer
+### 3.2 Inicialización idempotente con `init_db.py`
+
+`scripts/init_db.py` es el único punto de entrada para preparar el entorno:
+
+1. Crea `api/.env` desde `api/.env.example` si no existe.
+2. Genera `SECRET_KEY` si está vacía.
+3. Conecta a MySQL sin base de datos y crea `haydeensistem` si falta.
+4. Ejecuta `database/schema.sql` **solo** si el esquema no existe o si se usa `--reset`.
+5. Aplica todas las migraciones de `database/migrations/` en orden.
+6. Carga `database/demo_data.sql` salvo `--no-demo`.
+7. Crea roles, permisos y usuarios con PBKDF2.
+
+**Por qué no ejecuta `schema.sql` siempre:** ese archivo hace `DROP TABLE` y recrea todo. Ejecutarlo en cada arranque borraría datos. La inicialización normal detecta el esquema existente y solo aplica migraciones idempotentes.
+
+**Ejecución de SQL:** se usa una conexión PyMySQL dedicada con `CLIENT.MULTI_STATEMENTS` y lectura `utf-8-sig`. No se depende de `mysql.exe`, de Laragon ni de rutas absolutas. El pool de la API no habilita multi-statements: las consultas de la aplicación siguen siendo parametrizadas y de una sola sentencia.
+
+**Errores:** cualquier fallo de conexión muestra el tipo, el mensaje técnico exacto, host, puerto, usuario y base. Los errores SQL muestran la traza completa. No hay mensajes genéricos que oculten la causa.
+
+### 3.3 Seguridad con PBKDF2 y tokens Bearer
 
 **Contraseñas**
 
@@ -142,7 +164,7 @@ pbkdf2_sha256$260000$<salt_base64>$<digest_base64>
 - `admin` recibe `*`; el resto de roles solo sus permisos explícitos.
 - Los permisos se evalúan **siempre en el servidor**.
 
-### 3.3 Comunicación REST entre clientes
+### 3.4 Comunicación REST entre clientes
 
 - Formato JSON, sin GraphQL ni RPC.
 - Autenticación stateless desde el punto de vista del cliente: `Authorization: Bearer`.
@@ -152,14 +174,23 @@ pbkdf2_sha256$260000$<salt_base64>$<digest_base64>
 
 **Consecuencia:** cualquier cliente nuevo (otra app, integración, BI) solo necesita la API y un token.
 
-### 3.4 App móvil sin build step
+### 3.5 App móvil sin build step
 
 - HTML + JavaScript ES Modules + Tailwind por CDN.
 - Sin bundler: el despliegue es copiar archivos estáticos.
 - Ventaja: simplicidad operativa en una LAN clínica.
 - Deuda: Tailwind por CDN y ausencia de CSP estricta. El roadmap incluye un build local.
 
-### 3.5 Preparación para PyInstaller e Inno Setup
+### 3.6 Arranque y Developer Experience
+
+- `iniciar_api.bat` invoca directamente `api\.venv\Scripts\python.exe`; no se activa el entorno.
+- `scripts/run_api.py` lee `API_HOST` y `API_PORT` de `api/.env`, comprueba MySQL y lanza Uvicorn.
+- `iniciar_escritorio.bat` invoca `desktop\.venv\Scripts\python.exe`.
+- `probar_sistema.bat` ejecuta `scripts/test_sistema.py`.
+- No hay scripts PowerShell, políticas de ejecución ni pasos de activación.
+- `scripts/test_sistema.py` crea usuarios temporales, prueba login y RBAC, y los elimina al terminar. Si la API no está levantada, la inicia en un puerto libre y la detiene.
+
+### 3.7 Preparación para PyInstaller e Inno Setup
 
 - `desktop/admin_panel.py` es un único entrypoint con imports explícitos.
 - `packaging/pyinstaller/` aloja el `.spec` y recursos.
@@ -197,7 +228,7 @@ Cliente                         API                              MySQL
 
 | Entorno | `APP_ENV` | `CORS_ORIGINS` | `SECRET_KEY` | MySQL |
 | --- | --- | --- | --- | --- |
-| Local | `development` | `*` | Recomendada | `root` local |
+| Local | `development` | `*` | Generada por `init_db.py` | `root` local |
 | LAN de pruebas | `development` | IP/host del servidor | Obligatoria en la práctica | usuario dedicado |
 | Producción | `production` | Dominio HTTPS exacto | Obligatoria (falla al arrancar si falta) | usuario con permisos mínimos |
 
@@ -237,7 +268,7 @@ Cliente                         API                              MySQL
 | Login | Sin límite de intentos | Rate limiting por IP + backoff |
 | Transporte | HTTP en LAN | HTTPS con reverse proxy |
 | Auditoría | Movimientos de inventario | Tabla `auditoria` genérica |
-| Pruebas | Manuales | pytest + Playwright + CI |
+| Pruebas | `test_sistema.py` | pytest + Playwright + CI |
 | Frontend | Tailwind CDN | Build local + CSP |
 | Observabilidad | Logs de aplicación | Métricas y alertas |
 

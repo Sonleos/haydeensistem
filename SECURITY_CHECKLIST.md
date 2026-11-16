@@ -2,7 +2,7 @@
 
 Lista de verificación **obligatoria** antes del primer `git push` y antes de cualquier despliegue con datos reales.
 
-> Este documento es operativo, no una certificación. Marca cada casilla solo cuando hayas comprobado el resultado con el comando o la prueba indicada. Si un ítem marcado como **BLOQUEANTE** falla, no publiques ni desplegues.
+> Este documento es operativo, no una certificación. Marca cada casilla solo cuando hayas comprobado el resultado con el comando o la prueba indicada. Si un ítem marcado como **BLOQUEANTE** falla, no publiques ni despliegues.
 
 **Leyenda**
 
@@ -13,22 +13,24 @@ Lista de verificación **obligatoria** antes del primer `git push` y antes de cu
 | 🟡 MEDIO | Aceptable en demo/LAN, no en producción |
 | ⚪ INFORMATIVO | Registro de deuda técnica conocida |
 
+Todos los comandos están pensados para **cmd** desde la raíz del proyecto. No se requiere PowerShell.
+
 ---
 
 ## 0. Estado del repositorio
 
 - [ ] 🔴 El directorio no contiene repositorios Git anidados ni restos de otro proyecto.
 
-```powershell
-Get-ChildItem -Recurse -Force -Directory -Filter .git |
-  Where-Object { $_.FullName -ne (Join-Path $PWD '.git') } |
-  Select-Object FullName
+```cmd
+dir /s /b /ad .git
 ```
+
+Debe aparecer solo `C:\...\haydeensistem\.git`.
 
 - [ ] 🔴 `.gitignore` está en la raíz y cubre secretos, entornos virtuales, cachés, logs y volcados.
 - [ ] 🔴 `git init` se ejecutó **después** de revisar este checklist, o el historial está limpio.
 
-```powershell
+```cmd
 git status --short
 git log --oneline --all
 ```
@@ -39,40 +41,41 @@ git log --oneline --all
 
 - [ ] 🔴 `api/.env` existe en disco pero **no** está rastreado.
 
-```powershell
+```cmd
 git check-ignore -v api/.env
-git ls-files --error-unmatch api/.env 2>$null
+git ls-files --error-unmatch api/.env
 ```
 
 La segunda orden debe fallar. Si devuelve una ruta, el archivo está rastreado:
 
-```powershell
+```cmd
 git rm --cached api/.env
 ```
 
 - [ ] 🔴 No hay contraseñas, tokens, claves privadas ni cadenas de conexión en el código.
 
-```powershell
-git grep -n -I -E "(password|passwd|secret|token|api[_-]?key|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY)\s*[:=]" -- `
-  "*.py" "*.js" "*.ps1" "*.sql" "*.json" "*.md" "*.example"
+```cmd
+git grep -n -I -E "(password|passwd|secret|token|api[_-]?key|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY)\s*[:=]" -- "*.py" "*.js" "*.bat" "*.sql" "*.json" "*.md" "*.example"
 ```
 
 Revisa cada coincidencia. Son aceptables nombres de variables y textos de documentación; **no** lo son valores reales.
 
 - [ ] 🔴 No hay archivos `.env`, `.pem`, `.key`, `.pfx`, `.p12`, `.jks` ni volcados en el índice.
 
-```powershell
-git ls-files | Select-String -Pattern "\.(env|pem|key|pfx|p12|jks|dump|bak)$|\.sql\.gz$|\.sql\.zip$"
+```cmd
+git ls-files | findstr /I ".env .pem .key .pfx .p12 .jks .dump .bak"
 ```
+
+Debe devolver vacío.
 
 - [ ] 🔴 El historial no contiene secretos (relevante si ya hiciste commits).
 
-```powershell
-# Opción A: gitleaks (recomendado)
-docker run --rm -v "${PWD}:/repo" zricethezav/gitleaks:latest detect -s /repo -v
+```cmd
+:: Opción A: gitleaks (recomendado)
+docker run --rm -v "%CD%:/repo" zricethezav/gitleaks:latest detect -s /repo -v
 
-# Opción B: sin Docker, revisar el diff completo
-git log -p --all | Select-String -Pattern "admin123|SEED_[A-Z_]*PASSWORD\s*=\s*\S+|DB_PASSWORD\s*=\s*\S+"
+:: Opción B: sin Docker, revisar el diff completo
+git log -p --all | findstr /I "admin123 SEED_ADMIN_PASSWORD SEED_MEDICO_PASSWORD SEED_ENFERMERO_PASSWORD SEED_ADMINISTRATIVO_PASSWORD DB_PASSWORD"
 ```
 
 > Si un secreto ya entró al historial, **no basta con borrarlo del último commit**. Rota la credencial y reescribe el historial (`git filter-repo`) antes de publicar.
@@ -80,8 +83,8 @@ git log -p --all | Select-String -Pattern "admin123|SEED_[A-Z_]*PASSWORD\s*=\s*\
 - [ ] 🔴 `api/.env.example` solo contiene valores vacíos o de ejemplo, nunca credenciales reales.
 - [ ] 🟠 El correo y el usuario de GitHub en `SECURITY.md` fueron reemplazados (`<OWNER>`, `<REPO>`, `security@example.com`).
 
-```powershell
-Select-String -Path SECURITY.md -Pattern "<OWNER>|<REPO>|security@example.com"
+```cmd
+findstr /N /R "<OWNER> <REPO> security@example.com" SECURITY.md
 ```
 
 - [ ] 🟠 `NOTICE` tiene el titular real en lugar de `[NOMBRE DEL TITULAR O ENTIDAD]`.
@@ -93,16 +96,20 @@ Select-String -Path SECURITY.md -Pattern "<OWNER>|<REPO>|security@example.com"
 - [ ] 🔴 `database/schema.sql` no contiene credenciales reales, cadenas de conexión ni rutas absolutas de tu equipo.
 - [ ] 🔴 `database/demo_data.sql` solo contiene datos sintéticos. Sin nombres, documentos, teléfonos ni diagnósticos de personas reales.
 
-```powershell
-git grep -n -I -E "INSERT INTO .*(pacientes|personal|usuarios)" -- "database/*.sql" |
-  Measure-Object
+```cmd
+git grep -n -I -E "INSERT INTO .*(pacientes|personal|usuarios)" -- "database/*.sql"
 ```
 
 Revisa manualmente una muestra de cada tabla.
 
-- [ ] 🔴 `schema.sql` **no** contiene usuarios ni hashes de contraseña. Los usuarios se crean con `scripts/seed_system.py`.
+- [ ] 🔴 `schema.sql` **no** contiene usuarios ni hashes de contraseña. Los usuarios se crean con `scripts/init_db.py`.
 - [ ] 🔴 `database/seeds/*.json` está ignorado por Git y no se subió (contiene hashes PBKDF2).
-- [ ] 🟠 Las contraseñas generadas por el seeder se rotaron antes de compartir el entorno.
+
+```cmd
+git check-ignore -v database/seeds/initial_data.json
+```
+
+- [ ] 🟠 Las contraseñas generadas por `init_db.py` se rotaron antes de compartir el entorno.
 - [ ] 🟠 El usuario MySQL de la aplicación **no** es `root`. Tiene solo `SELECT, INSERT, UPDATE, DELETE` sobre `haydeensistem`.
 
 ```sql
@@ -125,7 +132,7 @@ FLUSH PRIVILEGES;
 - [ ] 🟠 Existe un endpoint de **logout** que borra la sesión en el servidor. *Estado actual: no implementado.*
 - [ ] 🔴 Existe **RBAC** por rol en cada endpoint sensible. *Implementado con `rol_permisos` y `require_permiso()`.*
 - [ ] 🔴 `SECRET_KEY` está definida y no se comparte por chat ni se sube al repositorio.
-- [ ] 🟠 La matriz de permisos se revisó: cada rol tiene solo lo necesario. *Ver `seed_system.py --list`.*
+- [ ] 🟠 La matriz de permisos se revisó: cada rol tiene solo lo necesario. *Ver `init_db.py --list`.*
 - [ ] 🟠 Al cambiar `SECRET_KEY` se aceptaron como invalidadas las sesiones activas.
 - [ ] 🟠 Existe **rate limiting** y bloqueo progresivo en `/api/auth/login`. *Estado actual: no implementado.*
 - [ ] 🟠 Las sesiones vencidas se limpian periódicamente.
@@ -143,7 +150,7 @@ DELETE FROM sesiones WHERE expira_en < UTC_TIMESTAMP();
 
 - [ ] 🔴 Todas las consultas usan parámetros `%s` de PyMySQL. Sin f-strings, `.format()` ni concatenación con datos de usuario.
 
-```powershell
+```cmd
 git grep -n -I -E "(execute|executemany)\(.*(f\"|f'|\.format\(|% \()" -- "api/*.py"
 ```
 
@@ -163,16 +170,15 @@ Debe devolver vacío.
 
 - [ ] 🔴 `CORS_ORIGINS` **no** es `*` fuera de desarrollo local.
 
-```powershell
-Select-String -Path api\.env -Pattern "^CORS_ORIGINS="
+```cmd
+findstr /B "CORS_ORIGINS=" api\.env
 ```
 
 - [ ] 🔴 La API no está expuesta directamente a Internet. Solo LAN, VPN o reverse proxy.
 - [ ] 🔴 El Firewall de Windows limita el puerto 8000 a la subred local, no a `Any`.
 
-```powershell
-Get-NetFirewallRule -DisplayName "Haydeen API 8000" |
-  Get-NetFirewallAddressFilter
+```cmd
+netsh advfirewall firewall show rule name="Haydeen API 8000"
 ```
 
 - [ ] 🟠 En producción se usa **HTTPS** con certificado válido (Caddy, Nginx o Traefik) y HSTS.
@@ -187,7 +193,7 @@ Get-NetFirewallRule -DisplayName "Haydeen API 8000" |
 
 - [ ] 🟠 Las dependencias están fijadas con rangos razonables y se auditan.
 
-```powershell
+```cmd
 api\.venv\Scripts\python.exe -m pip install pip-audit
 api\.venv\Scripts\python.exe -m pip_audit -r api\requirements.txt
 desktop\.venv\Scripts\python.exe -m pip_audit -r desktop\requirements.txt
@@ -214,18 +220,24 @@ desktop\.venv\Scripts\python.exe -m pip_audit -r desktop\requirements.txt
 
 ## 8. Verificación funcional antes del push
 
-- [ ] 🔴 La API arranca sin errores y responde en `/api/ping`.
+- [ ] 🔴 La API arranca sin errores con `iniciar_api.bat` y responde en `/api/ping`.
 
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/api/ping
+```cmd
+curl http://127.0.0.1:8000/api/ping
 ```
 
 - [ ] 🔴 El login funciona y devuelve token.
 - [ ] 🔴 Los listados principales responden con datos (pacientes, personal, inventario, tratamientos, control diario).
-- [ ] 🔴 El panel de escritorio abre y carga las tablas.
+- [ ] 🔴 El panel de escritorio abre con `iniciar_escritorio.bat` y carga las tablas.
 - [ ] 🔴 La app móvil abre en `http://127.0.0.1:8000/app/`, permite login y navegación.
-- [ ] 🔴 La importación demo conserva acentos y `ñ` (`Martínez`, `Ríos`, `González`).
-- [ ] 🟠 La importación demo es idempotente: ejecutarla dos veces no duplica registros.
+- [ ] 🔴 La prueba automática termina en verde:
+
+```cmd
+api\.venv\Scripts\python.exe scripts\test_sistema.py
+```
+
+- [ ] 🔴 La inicialización conserva acentos y `ñ` (`Martínez`, `Ríos`, `González`).
+- [ ] 🟠 `init_db.py` es idempotente: ejecutarlo dos veces no duplica registros ni borra datos.
 - [ ] 🟡 Se probó el flujo completo: login → paciente → signos vitales → administración con descuento de stock.
 
 ---
@@ -234,38 +246,36 @@ Invoke-RestMethod http://127.0.0.1:8000/api/ping
 
 Ejecuta en orden y revisa la salida de cada uno.
 
-```powershell
-# 1. Qué se va a subir exactamente
+```cmd
+:: 1. Qué se va a subir exactamente
 git status
 git diff --cached --stat
 git diff --cached
 
-# 2. Lista completa de archivos rastreados
+:: 2. Lista completa de archivos rastreados
 git ls-files
 
-# 3. Confirmar que los secretos están ignorados
+:: 3. Confirmar que los secretos están ignorados
 git check-ignore -v api/.env api/.venv desktop/.venv
 
-# 4. Buscar patrones de secretos en el índice
+:: 4. Buscar patrones de secretos en el índice
 git grep --cached -n -I -E "(admin123|SEED_[A-Z_]*PASSWORD\s*=\s*\S+|DB_PASSWORD\s*=\s*\S+|BEGIN .*PRIVATE KEY)"
 
-# 5. Revisar tamaño y tipo de archivos (evitar binarios y dumps)
-git ls-files -s | ForEach-Object { $_ }
+:: 5. Revisar tamaño y tipo de archivos (evitar binarios y dumps)
+git ls-files -s
+```
 
-# 6. Verificar que no hay archivos mayores a 5 MB
-git ls-files | ForEach-Object {
-  if (Test-Path $_) {
-    $f = Get-Item $_
-    if ($f.Length -gt 5MB) { "{0}  {1:N2} MB" -f $f.FullName, ($f.Length / 1MB) }
-  }
-}
+Para detectar archivos mayores a 5 MB:
+
+```cmd
+for /f "delims=" %f in ('git ls-files') do @if exist "%f" for %s in ("%f") do @if %~zs GTR 5242880 echo %f
 ```
 
 - [ ] 🔴 La salida de `git ls-files` no incluye `.env`, `.venv`, `__pycache__`, `*.log`, `*.sql.gz`, capturas con datos reales ni binarios de build.
 - [ ] 🔴 El commit no mezcla artefactos generados con código fuente.
 - [ ] 🟠 El remoto es el correcto y el repositorio es privado si aún no está listo para publicación.
 
-```powershell
+```cmd
 git remote -v
 ```
 
@@ -279,7 +289,7 @@ git remote -v
 | 2 | Sin logout ni revocación en servidor | Alto | Abierto | `DELETE FROM sesiones WHERE token_hash = ?` |
 | 3 | Sin rate limiting en login | Alto | Abierto | Middleware por IP + backoff |
 | 4 | `CORS_ORIGINS=*` por defecto | Medio | Abierto | Fijar orígenes reales |
-| 5 | Usuarios con contraseña conocida en `schema.sql` | Alto | **Resuelto** | Seeder con claves aleatorias |
+| 5 | Usuarios con contraseña conocida en `schema.sql` | Alto | **Resuelto** | `init_db.py` con claves aleatorias |
 | 6 | HTTP sin TLS | Alto | Abierto | Reverse proxy con HTTPS |
 | 7 | Sin auditoría genérica de cambios | Medio | Abierto | Tabla `auditoria` con usuario, acción, entidad |
 | 8 | Sin respaldos automáticos | Alto | Abierto | Job programado + restauración probada |
@@ -299,7 +309,7 @@ git remote -v
 - Hay un secreto real en el índice o en el historial.
 - Hay datos reales de pacientes en cualquier archivo.
 - `CORS_ORIGINS=*` en un entorno accesible fuera de tu equipo.
-- Una contraseña del seeder circula por chat/correo o no se rotó tras la puesta en marcha.
+- Una contraseña inicial circula por chat/correo o no se rotó tras la puesta en marcha.
 - `database/seeds/initial_data.json` está rastreado por Git.
 - El login, los listados o el registro de administración fallan.
 - No puedes restaurar un respaldo.

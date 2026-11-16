@@ -38,7 +38,7 @@ body:
         - Panel de escritorio (CustomTkinter)
         - App móvil (web)
         - Base de datos / migración
-        - Scripts / seeder
+        - Scripts / inicialización
         - Documentación
     validations:
       required: true

@@ -401,11 +401,11 @@ CREATE TABLE `control_panales` (
 -- 5. DATOS INICIALES
 --
 -- No se crean usuarios con contraseñas conocidas en el esquema.
--- Después de importar este archivo ejecuta:
+-- Después de aplicar este archivo ejecuta:
 --
---   python scripts/seed_system.py --apply
+--   api\.venv\Scripts\python.exe scripts\init_db.py
 --
--- El seeder crea admin, medico, enfermero y administrativo con
+-- init_db.py crea admin, medico, enfermero y administrativo con
 -- contraseñas aleatorias (o las indicadas por CLI/entorno) y hashes
 -- PBKDF2-SHA256.
 -- ------------------------------------------------------------

@@ -1,10 +1,13 @@
 # Seeds
 
-Esta carpeta almacena exportaciones locales de `scripts/seed_system.py`.
+Esta carpeta almacena exportaciones locales generadas por `scripts/init_db.py`.
 
-```powershell
-api\.venv\Scripts\python.exe scripts\seed_system.py --export-seed
-api\.venv\Scripts\python.exe scripts\seed_system.py --import-seed database\seeds\initial_data.json
+```cmd
+:: Exportar
+api\.venv\Scripts\python.exe scripts\init_db.py --export-seed
+
+:: Importar
+api\.venv\Scripts\python.exe scripts\init_db.py --import-seed database\seeds\initial_data.json
 ```
 
 ## Contenido
@@ -20,6 +23,6 @@ api\.venv\Scripts\python.exe scripts\seed_system.py --import-seed database\seeds
 - Los pacientes exportados solo incluyen documentos `PAC-*` o `DEMO-*`, con nombre y contacto anonimizados.
 - Si el archivo se filtra, rota las contraseñas con:
 
-```powershell
-api\.venv\Scripts\python.exe scripts\seed_system.py --apply --reset-passwords
+```cmd
+api\.venv\Scripts\python.exe scripts\init_db.py --reset-passwords
 ```

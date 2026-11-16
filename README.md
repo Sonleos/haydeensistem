@@ -12,7 +12,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-MVP%20funcional-yellow.svg)](#-roadmap)
 
-[Arquitectura](#-arquitectura-híbrida) · [Requisitos](#-requisitos-del-entorno) · [Guía rápida](#-guía-rápida) · [Roles](#-roles-y-permisos) · [Seeds](#-seeds-y-datos-iniciales) · [API](#-api-en-una-mirada) · [Documentación](#-documentación-técnica)
+[Inicio en 3 pasos](#-inicio-rápido-3-pasos) · [Arquitectura](#-arquitectura-híbrida) · [Roles](#-roles-y-permisos) · [Comandos](#-comandos-útiles) · [Documentación](#-documentación-técnica)
 
 </div>
 
@@ -33,6 +33,86 @@ Haydeén Sistema centraliza la operación diaria de una residencia geriátrica o
 - **App móvil**: consulta y registro en piso, con descuento de inventario al administrar.
 
 Una sola API alimenta dos clientes: un **panel de escritorio** para administración y una **app web mobile-first** para enfermería.
+
+## 🚀 Inicio rápido (3 pasos)
+
+> Requisito previo: Laragon instalado con MySQL 8 y Python 3.10+.
+
+### Paso 1 · Enciende Laragon
+
+Abre Laragon y pulsa **Start All**. MySQL debe escuchar en `127.0.0.1:3306`.
+
+### Paso 2 · Inicializa todo con un comando
+
+Desde la raíz del proyecto, en **cmd**:
+
+```cmd
+api\.venv\Scripts\python.exe scripts\init_db.py
+```
+
+Ese único comando:
+
+- crea `api/.env` si no existe y genera `SECRET_KEY`;
+- crea la base `haydeensistem` si no existe;
+- aplica el esquema y las migraciones;
+- carga los datos demo;
+- crea roles, permisos y los cuatro usuarios base;
+- muestra las contraseñas generadas **una sola vez**.
+
+Anota las contraseñas. No se vuelven a mostrar.
+
+### Paso 3 · Arranca la API
+
+Doble clic en **`iniciar_api.bat`** o desde cmd:
+
+```cmd
+iniciar_api.bat
+```
+
+| Recurso | URL |
+| --- | --- |
+| API | <http://127.0.0.1:8000> |
+| OpenAPI | <http://127.0.0.1:8000/docs> |
+| App móvil | <http://127.0.0.1:8000/app/> |
+| Health check | <http://127.0.0.1:8000/api/health> |
+
+Para el panel de escritorio, doble clic en **`iniciar_escritorio.bat`**.
+
+> No necesitas activar `.venv`, no necesitas PowerShell y no necesitas ejecutar `mysql.exe` a mano.
+
+### Primera vez: crea los entornos virtuales
+
+Solo si acabas de clonar el repositorio. No actives nada; llama directamente al Python de cada entorno:
+
+```cmd
+python -m venv api\.venv
+api\.venv\Scripts\python.exe -m pip install --upgrade pip
+api\.venv\Scripts\python.exe -m pip install -r api\requirements.txt
+
+python -m venv desktop\.venv
+desktop\.venv\Scripts\python.exe -m pip install --upgrade pip
+desktop\.venv\Scripts\python.exe -m pip install -r desktop\requirements.txt
+```
+
+### Abrir los clientes
+
+- **Web móvil:** `http://127.0.0.1:8000/app/` en la PC.
+- **Móvil real:** `http://<IP_LAN_DEL_SERVIDOR>:8000/app/` en la misma red.
+- **Escritorio:** `iniciar_escritorio.bat`.
+
+Obtén la IP local con:
+
+```cmd
+ipconfig
+```
+
+Si el móvil no conecta, permite el puerto en el Firewall (cmd como administrador):
+
+```cmd
+netsh advfirewall firewall add rule name="Haydeen API 8000" dir=in action=allow protocol=TCP localport=8000
+```
+
+> No expongas la API directamente a Internet. Usa VPN o reverse proxy con HTTPS.
 
 ## 🏗️ Arquitectura híbrida
 
@@ -83,7 +163,7 @@ Una sola API alimenta dos clientes: un **panel de escritorio** para administraci
 | Escritorio | CustomTkinter `>=5.2.2,<6.0`, Requests, Pillow |
 | Móvil | HTML5, JavaScript ES Modules, Tailwind CSS |
 | Seguridad | PBKDF2-SHA256 (260 000 iteraciones), HMAC-SHA256, permisos por rol |
-| Scripts | PowerShell 5.1+ y Python |
+| Scripts | Python 3.10+ y lanzadores `.bat` para `cmd` |
 | Empaquetado | PyInstaller + Inno Setup (estructura preparada) |
 
 ## ✅ Requisitos del entorno
@@ -93,7 +173,7 @@ Una sola API alimenta dos clientes: un **panel de escritorio** para administraci
 | Sistema operativo | Windows 10/11 para el panel. API y web son multiplataforma. |
 | Laragon | MySQL 8 en `127.0.0.1:3306`. |
 | Python | 3.10 o superior. |
-| PowerShell | 5.1 o superior. |
+| Consola | `cmd` o doble clic en los `.bat`. No se requiere PowerShell. |
 | Git | Para clonar y versionar. |
 | Navegador | Chrome, Edge, Firefox o Safari actualizado. |
 | Opcional | Node.js 18+ solo para pruebas E2E. |
@@ -109,130 +189,58 @@ Una sola API alimenta dos clientes: un **panel de escritorio** para administraci
 
 No se requiere Docker.
 
-## 🚀 Guía rápida
+## 🧪 Comando único de pruebas
 
-### 1. Clonar e instalar dependencias
+Con la API levantada o apagada, el script se encarga de todo:
 
-```powershell
-git clone <URL_DEL_REPOSITORIO> haydeensistem
-cd haydeensistem
-
-python -m venv api\.venv
-api\.venv\Scripts\python.exe -m pip install --upgrade pip
-api\.venv\Scripts\python.exe -m pip install -r api\requirements.txt
-
-python -m venv desktop\.venv
-desktop\.venv\Scripts\python.exe -m pip install --upgrade pip
-desktop\.venv\Scripts\python.exe -m pip install -r desktop\requirements.txt
+```cmd
+api\.venv\Scripts\python.exe scripts\test_sistema.py
 ```
 
-### 2. Configurar variables de entorno
+También puedes hacer doble clic en **`probar_sistema.bat`**.
 
-```powershell
-Copy-Item api\.env.example api\.env
-```
+Verifica:
 
-Genera una `SECRET_KEY` propia y pégala en `api/.env`:
+- conexión a MySQL;
+- `/api/ping` y `/api/health`;
+- rechazo sin token (`401`);
+- login de un usuario temporal;
+- endpoints principales (`200`);
+- RBAC: `administrativo` recibe `403` en tratamientos;
+- limpieza de los usuarios temporales.
 
-```powershell
-api\.venv\Scripts\python.exe -c "import secrets; print(secrets.token_hex(32))"
-```
+## 🛠️ Comandos útiles
 
-| Variable | Ejemplo | Descripción |
-| --- | --- | --- |
-| `APP_ENV` | `development` | `production` exige `SECRET_KEY`. |
-| `DB_HOST` | `127.0.0.1` | Host de MySQL. |
-| `DB_PORT` | `3306` | Puerto de MySQL. |
-| `DB_USER` | `root` | Usuario de MySQL. |
-| `DB_PASSWORD` | *(vacío)* | Contraseña de MySQL. |
-| `DB_NAME` | `haydeensistem` | Base de datos. |
-| `DB_POOL_SIZE` | `5` | Conexiones del pool. |
-| `DB_POOL_TIMEOUT` | `10` | Segundos de espera por conexión. |
-| `SESSION_HOURS` | `12` | Vigencia del token Bearer. |
-| `CORS_ORIGINS` | `*` | Orígenes permitidos, separados por coma. |
-| `SECRET_KEY` | `64 hex` | Pepper HMAC de tokens. |
-| `API_HOST` | `0.0.0.0` | `0.0.0.0` habilita LAN. |
-| `API_PORT` | `8000` | Puerto de Uvicorn. |
-
-> En producción **no uses `CORS_ORIGINS=*`** ni el usuario `root`. Crea un usuario MySQL dedicado con permisos mínimos.
-
-### 3. Base de datos, demo y usuarios
-
-Un solo comando crea el esquema, carga datos sintéticos y ejecuta el seeder:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\import_demo.ps1
-```
-
-El seeder genera contraseñas aleatorias y las muestra **una sola vez**. Anótalas.
-
-Si solo quieres recrear el esquema o solo los datos:
-
-```powershell
-.\scripts\import_demo.ps1 -SchemaOnly
-.\scripts\import_demo.ps1 -DemoOnly
-.\scripts\import_demo.ps1 -SkipSeed
-```
-
-> `schema.sql` elimina y recrea todas las tablas. No lo ejecutes sobre datos reales.
-
-### 4. Levantar la API
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_api.ps1
-```
-
-O manualmente:
-
-```powershell
-cd api
-.\.venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8000
-```
-
-| Recurso | URL |
+| Comando | Qué hace |
 | --- | --- |
-| API | <http://127.0.0.1:8000> |
-| OpenAPI | <http://127.0.0.1:8000/docs> |
-| App móvil | <http://127.0.0.1:8000/app/> |
-| Health check | <http://127.0.0.1:8000/api/health> |
+| `api\.venv\Scripts\python.exe scripts\init_db.py` | Inicializa o actualiza todo (idempotente). |
+| `... init_db.py --check` | Verifica conexión, base y tablas. |
+| `... init_db.py --list` | Muestra roles, permisos y usuarios. |
+| `... init_db.py --reset` | Recrea el esquema desde cero (**destructivo**). |
+| `... init_db.py --no-demo` | Inicializa sin datos demo. |
+| `... init_db.py --reset-passwords` | Rota las contraseñas existentes. |
+| `... init_db.py --export-seed` | Exporta un seed JSON anonimizado. |
+| `... init_db.py --import-seed RUTA` | Importa un seed JSON. |
+| `api\.venv\Scripts\python.exe scripts\test_sistema.py` | Prueba rápida de BD, API y RBAC. |
+| `iniciar_api.bat` | Arranca la API leyendo `api/.env`. |
+| `iniciar_escritorio.bat` | Abre el panel CustomTkinter. |
 
-### 5. Abrir el panel de escritorio
+## 🧯 Solución de problemas
 
-```powershell
-cd desktop
-.\.venv\Scripts\python.exe admin_panel.py
-```
-
-### 6. Abrir la app móvil
-
-En la PC: `http://127.0.0.1:8000/app/`
-
-En el teléfono, misma red:
-
-```text
-http://<IP_LAN_DEL_SERVIDOR>:8000/app/
-```
-
-Obtén la IP con:
-
-```powershell
-Get-NetIPAddress -AddressFamily IPv4 |
-  Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } |
-  Select-Object InterfaceAlias, IPAddress
-```
-
-Permite el puerto en el Firewall (PowerShell como administrador):
-
-```powershell
-New-NetFirewallRule -DisplayName "Haydeen API 8000" `
-  -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow
-```
-
-> No expongas la API directamente a Internet. Usa VPN o reverse proxy con HTTPS.
+| Síntoma | Solución |
+| --- | --- |
+| `Can't connect to MySQL server` | Laragon no está encendido o `DB_HOST`/`DB_PORT` no coinciden. `init_db.py` muestra el error técnico exacto. |
+| `No existe api\.venv` | Ejecuta los comandos de “Primera vez” y vuelve a intentar. |
+| `No existe api\.env` | Ejecuta `api\.venv\Scripts\python.exe scripts\init_db.py`. |
+| Olvidé las contraseñas | `api\.venv\Scripts\python.exe scripts\init_db.py --reset-passwords`. |
+| El puerto 8000 está ocupado | Cambia `API_PORT` en `api/.env` y vuelve a ejecutar `iniciar_api.bat`. |
+| La app móvil no abre desde el teléfono | Revisa la IP LAN, el firewall y que la API escuche en `0.0.0.0`. |
+| Ves acentos raros en `cmd` | Ejecuta `chcp 65001` antes del comando. Los `.bat` ya lo configuran. |
+| Quiero empezar de cero | `api\.venv\Scripts\python.exe scripts\init_db.py --reset`. |
 
 ## 👥 Roles y permisos
 
-El seeder crea cuatro usuarios operativos. Los roles `farmacia` y `recepcion` existen en el esquema para asignación futura.
+`init_db.py` crea cuatro usuarios operativos. Los roles `farmacia` y `recepcion` existen en el esquema para asignación futura.
 
 | Usuario | Rol | Acceso |
 | --- | --- | --- |
@@ -261,45 +269,45 @@ Los permisos viven en la tabla `rol_permisos` y se aplican con `require_permiso(
 
 ### Contraseñas
 
-- El seeder las genera aleatoriamente (16 caracteres) si no se indican.
+- `init_db.py` genera contraseñas aleatorias (16 caracteres) si no se indican.
 - También puedes fijarlas por CLI o variable de entorno:
 
-```powershell
-api\.venv\Scripts\python.exe scripts\seed_system.py --apply `
-  --password-admin "UnaClaveLarga#2026" `
-  --password-medico "OtraClaveLarga#2026"
-
-$env:SEED_ENFERMERO_PASSWORD = "<CLAVE_LARGA_DE_EJEMPLO>"
-api\.venv\Scripts\python.exe scripts\seed_system.py --apply
+```cmd
+api\.venv\Scripts\python.exe scripts\init_db.py --password-admin "UnaClaveLarga#2026" --password-medico "OtraClaveLarga#2026"
 ```
 
-- Para rotar todas las claves de usuarios existentes:
+```cmd
+set SEED_ENFERMERO_PASSWORD=ClaveEnfermeria#2026
+api\.venv\Scripts\python.exe scripts\init_db.py
+```
 
-```powershell
-api\.venv\Scripts\python.exe scripts\seed_system.py --apply --reset-passwords
+- Para rotar todas las claves existentes:
+
+```cmd
+api\.venv\Scripts\python.exe scripts\init_db.py --reset-passwords
 ```
 
 Nunca hay contraseñas en texto plano dentro del repositorio ni en `schema.sql`.
 
 ## 🌱 Seeds y datos iniciales
 
-`scripts/seed_system.py` usa la conexión real de `api/db.py` y el hash de `api/security.py`.
+`scripts/init_db.py` usa la conexión real de `api/db.py` y el hash de `api/security.py`.
 
-```powershell
-# Crear roles, permisos y usuarios
-api\.venv\Scripts\python.exe scripts\seed_system.py --apply
+```cmd
+:: Crear/actualizar todo
+api\.venv\Scripts\python.exe scripts\init_db.py
 
-# Ver roles, permisos y usuarios
-api\.venv\Scripts\python.exe scripts\seed_system.py --list
+:: Ver roles, permisos y usuarios
+api\.venv\Scripts\python.exe scripts\init_db.py --list
 
-# Verificar conexión y esquema
-api\.venv\Scripts\python.exe scripts\seed_system.py --check
+:: Verificar conexión y esquema
+api\.venv\Scripts\python.exe scripts\init_db.py --check
 
-# Exportar configuración + catálogo + pacientes demo anonimizados
-api\.venv\Scripts\python.exe scripts\seed_system.py --export-seed
+:: Exportar configuración + catálogo + pacientes demo anonimizados
+api\.venv\Scripts\python.exe scripts\init_db.py --export-seed
 
-# Importar un seed en otra instalación
-api\.venv\Scripts\python.exe scripts\seed_system.py --import-seed database\seeds\initial_data.json
+:: Importar un seed en otra instalación
+api\.venv\Scripts\python.exe scripts\init_db.py --import-seed database\seeds\initial_data.json
 ```
 
 El JSON se escribe en `database/seeds/initial_data.json` con `encoding="utf-8"` y `ensure_ascii=False`, por lo que conserva acentos y `ñ`. Incluye:
@@ -350,12 +358,15 @@ haydeensistem/
 │   ├── css/styles.css
 │   └── js/api.js, app.js
 ├── scripts/
-│   ├── seed_system.py        # Roles, permisos, usuarios y seeds
-│   ├── import_demo.ps1       # Esquema + demo + seeder
-│   └── start_api.ps1         # Arranque local/LAN
+│   ├── init_db.py            # Inicialización completa e idempotente
+│   ├── run_api.py            # Arranque de Uvicorn leyendo api/.env
+│   └── test_sistema.py       # Prueba rápida de BD, API y RBAC
 ├── docs/                     # Documentación técnica y capturas
 ├── packaging/                # PyInstaller e Inno Setup
 ├── .github/                  # Plantillas de PR e issues
+├── iniciar_api.bat           # Arranque con doble clic
+├── iniciar_escritorio.bat    # Panel de escritorio
+├── probar_sistema.bat        # Pruebas con doble clic
 ├── README.md
 ├── SECURITY.md
 ├── SECURITY_CHECKLIST.md
@@ -372,6 +383,7 @@ haydeensistem/
 - SQL **parametrizado** en todas las consultas.
 - Validación de entrada con **Pydantic** y `CHECK` en MySQL.
 - Cero credenciales en el repositorio: `.env` ignorado y `schema.sql` sin usuarios.
+- `init_db.py` genera `SECRET_KEY` y contraseñas aleatorias; nunca escribe claves en el código.
 - Frontend móvil con escape de HTML antes de insertar datos dinámicos.
 
 Pendiente antes de producción: logout con revocación en servidor, rate limiting, HTTPS, auditoría genérica y respaldos automáticos. Revisa [`SECURITY_CHECKLIST.md`](SECURITY_CHECKLIST.md).
@@ -395,7 +407,8 @@ Pendiente antes de producción: logout con revocación en servidor, rate limitin
 - [x] App móvil con login, pacientes, tratamientos y control diario.
 - [x] Registro de signos vitales y administración con descuento de inventario.
 - [x] RBAC por rol y permisos en base de datos.
-- [x] Seeder seguro con exportación/importación UTF-8.
+- [x] Inicialización unificada con `init_db.py` y lanzadores `.bat`.
+- [x] Prueba rápida con `test_sistema.py`.
 - [ ] Logout con revocación de sesión en servidor.
 - [ ] Rate limiting y bloqueo progresivo en login.
 - [ ] Auditoría genérica de cambios.

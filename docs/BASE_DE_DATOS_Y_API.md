@@ -130,8 +130,8 @@ Se validan en Pydantic **y** con `CHECK` en MySQL: dos barreras independientes.
 
 - `database/demo_data.sql` es idempotente (`INSERT IGNORE` / `WHERE NOT EXISTS`).
 - Usa documentos `PAC-*`, `MED-*`, `ENF-*`, `FAR-*`, `REC-*` y teléfonos `555-*`.
-- No contiene usuarios ni contraseñas: los crea `scripts/seed_system.py`.
-- `seed_system.py --export-seed` solo exporta pacientes con documento `PAC-*` o `DEMO-*` y anonimiza nombre y contacto.
+- No contiene usuarios ni contraseñas: los crea `scripts/init_db.py`.
+- `init_db.py --export-seed` solo exporta pacientes con documento `PAC-*` o `DEMO-*` y anonimiza nombre y contacto.
 
 ## 3. API REST
 
@@ -145,13 +145,17 @@ Documentación interactiva: `http://127.0.0.1:8000/docs`
 | `POST` | `/auth/login` | público | Devuelve `token`, `expires_in` y datos del usuario |
 | `GET` | `/auth/me` | autenticado | Usuario, rol y lista de permisos |
 
-```powershell
-$body = @{ username = "admin"; password = "<TU_CLAVE>" } | ConvertTo-Json
-$login = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/auth/login" `
-  -Method Post -ContentType "application/json" -Body $body
-$headers = @{ Authorization = "Bearer $($login.token)" }
+```cmd
+curl -X POST http://127.0.0.1:8000/api/auth/login ^
+  -H "Content-Type: application/json" ^
+  -d "{\"username\":\"admin\",\"password\":\"<TU_CLAVE>\"}"
+```
 
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/auth/me" -Headers $headers
+Copia el `token` y úsalo así:
+
+```cmd
+curl http://127.0.0.1:8000/api/auth/me ^
+  -H "Authorization: Bearer <TU_TOKEN>"
 ```
 
 ### 3.2 Sistema y dashboard
@@ -185,8 +189,9 @@ Incluye datos de contacto y alergias. **Es información clínica sensible**: no 
 | `GET` | `/inventario` | `inventario:leer` | Medicamentos con disponible, lotes y alerta |
 | `GET` | `/inventario/lotes` | `inventario:leer` | Lotes; filtros `medicamento_id` y `solo_disponibles` |
 
-```powershell
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/inventario/lotes?medicamento_id=1&solo_disponibles=true" -Headers $headers
+```cmd
+curl "http://127.0.0.1:8000/api/inventario/lotes?medicamento_id=1&solo_disponibles=true" ^
+  -H "Authorization: Bearer <TU_TOKEN>"
 ```
 
 ### 3.6 Tratamientos
@@ -241,27 +246,46 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/inventario/lotes?medicamento_i
 | `500` | Error interno (se registra en logs, no se expone la traza) |
 | `503` | MySQL no disponible |
 
-## 4. Migraciones
+## 4. Inicialización y migraciones
 
-Regla del equipo: **no se sobrescribe `schema.sql` para cambios incrementales**.
+**Regla del equipo:** `schema.sql` no se sobrescribe para cambios incrementales.
 
 1. `schema.sql` describe el estado base para instalaciones nuevas.
 2. Cada cambio va en `database/migrations/NNN_descripcion.sql`, idempotente.
-3. La migración se prueba sobre una copia de la base.
-4. Se actualizan `schema.sql` (para nuevos entornos) y la documentación.
-5. Se registra en el PR con el SQL exacto y el plan de reversa.
+3. `scripts/init_db.py` aplica automáticamente todas las migraciones en orden.
+4. La migración se prueba sobre una copia de la base.
+5. Se actualiza `schema.sql` (para nuevos entornos) y la documentación.
+6. Se registra en el PR con el SQL exacto y el plan de reversa.
 
-Migración existente:
+### Inicializar o actualizar
+
+```cmd
+api\.venv\Scripts\python.exe scripts\init_db.py
+```
+
+- Si la base no existe, crea todo.
+- Si ya existe, **no ejecuta `schema.sql`**: solo aplica migraciones y demo.
+- `init_db.py` adapta el `USE` de los archivos SQL a `DB_NAME`, así que puedes cambiar de base sin editar los `.sql`.
+- `--reset` recrea el esquema desde cero (**destructivo**).
+- `--no-demo` omite los datos sintéticos.
+- `--check` verifica conexión, base y tablas.
+- `--list` muestra roles, permisos y usuarios.
+
+### Migración existente
 
 | Archivo | Contenido |
 | --- | --- |
 | `001_rol_permisos.sql` | Crea `rol_permisos`, agrega rol `administrativo` y su matriz de permisos |
 
-```powershell
-cmd /c "C:\laragon\bin\mysql\mysql-8.4.3-winx64\bin\mysql.exe -u root --default-character-set=utf8mb4 < database\migrations\001_rol_permisos.sql"
-```
+Para añadir una migración:
 
-> Ajusta la ruta de `mysql.exe` según tu instalación o usa `MYSQL_EXE`.
+1. Crea `database/migrations/002_descripcion.sql`.
+2. Hazla idempotente (`CREATE TABLE IF NOT EXISTS`, `INSERT IGNORE`, etc.).
+3. Ejecuta `api\.venv\Scripts\python.exe scripts\init_db.py`.
+4. Verifica con `--check` y `--list`.
+5. Actualiza este documento y `schema.sql`.
+
+No uses `mysql.exe`, rutas de Laragon ni scripts PowerShell. `init_db.py` ya ejecuta el SQL con PyMySQL y UTF-8.
 
 ## 5. Consultas de diagnóstico
 
@@ -286,4 +310,11 @@ SELECT m.nombre, COALESCE(SUM(l.cantidad_disponible), 0) AS disponible,
 
 -- Sesiones activas
 SELECT COUNT(*) AS activas FROM sesiones WHERE expira_en > NOW();
+```
+
+También puedes usar:
+
+```cmd
+api\.venv\Scripts\python.exe scripts\init_db.py --list
+api\.venv\Scripts\python.exe scripts\test_sistema.py
 ```

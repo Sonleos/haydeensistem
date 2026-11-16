@@ -31,7 +31,8 @@ Closes #<ticket>
 ## Checklist
 
 - [ ] La rama está actualizada con `dev`.
-- [ ] Probé la API localmente.
+- [ ] `api\.venv\Scripts\python.exe scripts\test_sistema.py` termina en verde.
+- [ ] Probé la API localmente con `iniciar_api.bat`.
 - [ ] Probé el panel de escritorio si cambié UI.
 - [ ] Probé la app móvil si cambié UI.
 - [ ] Probé la matriz de permisos si cambié roles o endpoints.

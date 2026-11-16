@@ -1,21 +1,25 @@
 #!/usr/bin/env python
-"""Seeder seguro de Haydeén Sistema.
+"""Inicialización completa de Haydeén Sistema.
 
-Crea roles, permisos y usuarios base usando el hash PBKDF2-SHA256 real del
-proyecto (`api/security.py`). No contiene contraseñas en texto plano: si no se
-indican por CLI o variable de entorno, genera contraseñas aleatorias y las
-muestra una sola vez.
+Un solo comando crea el entorno, la base de datos, el esquema, las
+migraciones, los datos demo y los usuarios base:
 
-Uso:
-    python scripts/seed_system.py --apply
-    python scripts/seed_system.py --apply --reset-passwords
-    python scripts/seed_system.py --export-seed
-    python scripts/seed_system.py --import-seed
-    python scripts/seed_system.py --list
-    python scripts/seed_system.py --check
+    api\\.venv\\Scripts\\python.exe scripts\\init_db.py
 
-Las contraseñas también pueden definirse así:
-    SEED_ADMIN_PASSWORD=... SEED_MEDICO_PASSWORD=... python scripts/seed_system.py --apply
+Es idempotente: si la base ya existe no vuelve a ejecutar `schema.sql`
+(destructivo). Para recrear todo desde cero usa `--reset`.
+
+Otros usos:
+
+    api\\.venv\\Scripts\\python.exe scripts\\init_db.py --check
+    api\\.venv\\Scripts\\python.exe scripts\\init_db.py --list
+    api\\.venv\\Scripts\\python.exe scripts\\init_db.py --reset
+    api\\.venv\\Scripts\\python.exe scripts\\init_db.py --no-demo
+    api\\.venv\\Scripts\\python.exe scripts\\init_db.py --reset-passwords
+    api\\.venv\\Scripts\\python.exe scripts\\init_db.py --export-seed
+    api\\.venv\\Scripts\\python.exe scripts\\init_db.py --import-seed
+
+No requiere PowerShell, mysql.exe ni activar el entorno virtual.
 """
 
 from __future__ import annotations
@@ -23,9 +27,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import secrets
 import string
 import sys
+import time
+import traceback
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -37,16 +44,28 @@ for _stream in (sys.stdout, sys.stderr):
 
 ROOT = Path(__file__).resolve().parent.parent
 API_DIR = ROOT / "api"
-if str(API_DIR) not in sys.path:
-    sys.path.insert(0, str(API_DIR))
+ENV_PATH = API_DIR / ".env"
+ENV_EXAMPLE = API_DIR / ".env.example"
 
-from config import settings  # noqa: E402
-from db import db  # noqa: E402
-from security import hash_password  # noqa: E402
+SCHEMA_PATH = ROOT / "database" / "schema.sql"
+DEMO_PATH = ROOT / "database" / "demo_data.sql"
+MIGRATIONS_DIR = ROOT / "database" / "migrations"
+DEFAULT_EXPORT = ROOT / "database" / "seeds" / "initial_data.json"
 
 SEED_VERSION = 1
-DEFAULT_EXPORT = ROOT / "database" / "seeds" / "initial_data.json"
 MIN_PASSWORD_LENGTH = 12
+
+# Tablas mínimas para considerar que el esquema ya está creado.
+CORE_TABLES = {
+    "roles",
+    "personal",
+    "usuarios",
+    "pacientes",
+    "medicamentos",
+    "inventario_lotes",
+    "tratamientos",
+    "signos_vitales",
+}
 
 ROLES: dict[str, str] = {
     "admin": "Administración general del sistema",
@@ -143,9 +162,196 @@ USERS: list[dict[str, str]] = [
     },
 ]
 
+settings = None
+db = None
+hash_password = None
+
 
 # ---------------------------------------------------------------------------
-# Utilidades
+# Entorno
+# ---------------------------------------------------------------------------
+
+def _write_env(text: str) -> None:
+    with ENV_PATH.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
+
+
+def ensure_env_file() -> None:
+    """Crea api/.env si no existe y genera SECRET_KEY si está vacía."""
+    if not ENV_PATH.exists():
+        if not ENV_EXAMPLE.exists():
+            raise SystemExit(
+                f"No existe {ENV_EXAMPLE}. Restaura la plantilla del repositorio."
+            )
+        text = ENV_EXAMPLE.read_text(encoding="utf-8")
+        _write_env(text)
+        print(f"[env] Creado {ENV_PATH.relative_to(ROOT)} desde .env.example")
+
+    text = ENV_PATH.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    changed = False
+    found = False
+
+    for index, line in enumerate(lines):
+        if line.strip().startswith("SECRET_KEY="):
+            found = True
+            value = line.split("=", 1)[1].strip()
+            if not value:
+                lines[index] = f"SECRET_KEY={secrets.token_hex(32)}"
+                changed = True
+            break
+
+    if not found:
+        lines.append(f"SECRET_KEY={secrets.token_hex(32)}")
+        changed = True
+
+    if changed:
+        _write_env("\n".join(lines) + "\n")
+        print("[env] SECRET_KEY generada automáticamente")
+
+
+def bootstrap() -> None:
+    """Carga configuración y utilidades reales del proyecto."""
+    global settings, db, hash_password
+
+    ensure_env_file()
+
+    if str(API_DIR) not in sys.path:
+        sys.path.insert(0, str(API_DIR))
+
+    from config import settings as _settings  # noqa: PLC0415
+    from db import db as _db  # noqa: PLC0415
+    from security import hash_password as _hash_password  # noqa: PLC0415
+
+    settings = _settings
+    db = _db
+    hash_password = _hash_password
+    _validate_db_name()
+
+
+# ---------------------------------------------------------------------------
+# Conexión y SQL
+# ---------------------------------------------------------------------------
+
+def _pymysql():
+    try:
+        import pymysql  # noqa: PLC0415
+    except ImportError as exc:
+        raise SystemExit(
+            "Falta PyMySQL. Instala las dependencias con:\n"
+            "  api\\.venv\\Scripts\\python.exe -m pip install -r api\\requirements.txt"
+        ) from exc
+    return pymysql
+
+
+def _connection(with_database: bool):
+    pymysql = _pymysql()
+    from pymysql.constants import CLIENT  # noqa: PLC0415
+    from pymysql.cursors import DictCursor  # noqa: PLC0415
+
+    return pymysql.connect(
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        database=settings.DB_NAME if with_database else None,
+        charset="utf8mb4",
+        cursorclass=DictCursor,
+        autocommit=False,
+        connect_timeout=5,
+        read_timeout=60,
+        write_timeout=60,
+        client_flag=CLIENT.MULTI_STATEMENTS,
+    )
+
+
+def _validate_db_name() -> None:
+    if not re.fullmatch(r"[A-Za-z0-9_]+", settings.DB_NAME):
+        raise SystemExit(
+            f"DB_NAME inválido: {settings.DB_NAME!r}. Usa solo letras, números y guion bajo."
+        )
+
+
+def _database_exists() -> bool:
+    connection = _connection(with_database=False)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = %s",
+                (settings.DB_NAME,),
+            )
+            return cursor.fetchone() is not None
+    finally:
+        connection.close()
+
+
+def _create_database() -> bool:
+    _validate_db_name()
+    connection = _connection(with_database=False)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"CREATE DATABASE IF NOT EXISTS `{settings.DB_NAME}` "
+                "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+            )
+        connection.commit()
+    finally:
+        connection.close()
+    return True
+
+
+def _adapt_sql(script: str) -> str:
+    """Ajusta el nombre de la base para respetar DB_NAME de api/.env."""
+    script = re.sub(
+        r"CREATE\s+DATABASE\s+IF\s+NOT\s+EXISTS\s+`[^`]+`",
+        f"CREATE DATABASE IF NOT EXISTS `{settings.DB_NAME}`",
+        script,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+    script = re.sub(
+        r"\bUSE\s+`[^`]+`\s*;",
+        f"USE `{settings.DB_NAME}`;",
+        script,
+        count=0,
+        flags=re.IGNORECASE,
+    )
+    return script
+
+
+def _run_sql_file(connection, path: Path) -> None:
+    if not path.exists():
+        raise SystemExit(f"No existe el archivo SQL: {path}")
+
+    script = _adapt_sql(path.read_text(encoding="utf-8-sig"))
+    started = time.perf_counter()
+    print(f"[sql] {path.relative_to(ROOT)} ...", end="", flush=True)
+
+    with connection.cursor() as cursor:
+        cursor.execute(script)
+        while cursor.nextset():
+            pass
+
+    connection.commit()
+    elapsed = time.perf_counter() - started
+    print(f" OK ({elapsed:.2f}s)")
+
+
+def _apply_migrations(connection) -> None:
+    if not MIGRATIONS_DIR.exists():
+        return
+
+    files = sorted(MIGRATIONS_DIR.glob("*.sql"))
+    if not files:
+        return
+
+    print(f"[sql] Aplicando {len(files)} migración(es) idempotente(s)")
+    for path in files:
+        _run_sql_file(connection, path)
+
+
+# ---------------------------------------------------------------------------
+# Utilidades del seed
 # ---------------------------------------------------------------------------
 
 def _json_default(value: Any) -> Any:
@@ -189,7 +395,7 @@ def _print_header(title: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Aplicar roles, permisos y usuarios
+# Roles, permisos y usuarios
 # ---------------------------------------------------------------------------
 
 def _ensure_roles(cursor) -> None:
@@ -244,7 +450,7 @@ def _ensure_personal(cursor, user: dict[str, str], rol_id: int) -> int:
             user["documento"],
             user["email"],
             rol_id,
-            "Registro creado por seed_system.py",
+            "Registro creado por init_db.py",
         ),
     )
     return int(cursor.lastrowid)
@@ -287,37 +493,28 @@ def _ensure_user(
     return "creado", password
 
 
-def apply_seed(reset: bool, args: argparse.Namespace) -> int:
-    _print_header("SEED · Roles, permisos y usuarios base")
+def apply_seed(reset_passwords: bool, args: argparse.Namespace) -> int:
+    _print_header("USUARIOS · Roles, permisos y usuarios base")
 
-    resolved: list[tuple[dict[str, str], str, str]] = []
+    resolved: list[tuple[dict[str, str], str]] = []
     for user in USERS:
-        password, origin = _resolve_password(user, args)
+        password, _origin = _resolve_password(user, args)
         _validate_password(user, password)
-        resolved.append((user, password, origin))
+        resolved.append((user, password))
 
     results: list[tuple[str, str, str, str | None]] = []
 
-    try:
-        with db.cursor(commit=True) as cursor:
-            _ensure_roles(cursor)
-            _ensure_permissions(cursor)
+    with db.cursor(commit=True) as cursor:
+        _ensure_roles(cursor)
+        _ensure_permissions(cursor)
 
-            for user, password, _origin in resolved:
-                rol_id = _role_id(cursor, user["rol"])
-                personal_id = _ensure_personal(cursor, user, rol_id)
-                estado, shown = _ensure_user(
-                    cursor, user, rol_id, personal_id, password, reset
-                )
-                results.append((user["username"], user["rol"], estado, shown))
-    except Exception as exc:
-        if "rol_permisos" in str(exc):
-            print(
-                "\nFalta la tabla 'rol_permisos'. Ejecuta la migración:\n"
-                "  database/migrations/001_rol_permisos.sql\n",
-                file=sys.stderr,
+        for user, password in resolved:
+            rol_id = _role_id(cursor, user["rol"])
+            personal_id = _ensure_personal(cursor, user, rol_id)
+            estado, shown = _ensure_user(
+                cursor, user, rol_id, personal_id, password, reset_passwords
             )
-        raise
+            results.append((user["username"], user["rol"], estado, shown))
 
     print(f"{'USUARIO':<16} {'ROL':<16} {'ESTADO':<18} CONTRASEÑA")
     print("-" * 68)
@@ -403,9 +600,8 @@ def export_seed(path: Path) -> int:
         """
     )
 
-    # Solo se exportan pacientes con documento de demostración (PAC-* o
-    # DEMO-*). Así el seed nunca arrastra identificadores de personas reales
-    # y sigue siendo idempotente al reimportarlo en la misma base.
+    # Solo pacientes con documento de demostración. El seed nunca arrastra
+    # identificadores de personas reales y sigue siendo idempotente.
     pacientes_rows = db.fetch_all(
         """
         SELECT documento, fecha_nacimiento, sexo, tipo_residencia, habitacion,
@@ -465,9 +661,11 @@ def export_seed(path: Path) -> int:
         handle.write("\n")
 
     print(f"Archivo: {path}")
-    print(f"Roles: {len(roles)} · Usuarios: {len(usuarios)} · "
-          f"Medicamentos: {len(medicamentos)} · Lotes: {len(lotes)} · "
-          f"Pacientes anonimizados: {len(pacientes)}")
+    print(
+        f"Roles: {len(roles)} · Usuarios: {len(usuarios)} · "
+        f"Medicamentos: {len(medicamentos)} · Lotes: {len(lotes)} · "
+        f"Pacientes anonimizados: {len(pacientes)}"
+    )
     print()
     print("El JSON incluye hashes de contraseñas y datos clínicos anonimizados.")
     print("Está excluido de Git por .gitignore; trátalo como material sensible.")
@@ -705,6 +903,77 @@ def import_seed(path: Path) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Inicialización
+# ---------------------------------------------------------------------------
+
+def initialize(reset: bool, no_demo: bool, reset_passwords: bool, args: argparse.Namespace) -> int:
+    _print_header("INIT · Haydeén Sistema")
+
+    if reset:
+        print("ATENCIÓN: --reset elimina y recrea todas las tablas.")
+        print("No lo uses sobre una base con datos reales.")
+
+    print(f"MySQL: {settings.DB_HOST}:{settings.DB_PORT}")
+    print(f"Base:  {settings.DB_NAME}")
+    print(f"Usuario: {settings.DB_USER}")
+
+    if _database_exists():
+        print(f"[db] La base '{settings.DB_NAME}' ya existe")
+    else:
+        _create_database()
+        print(f"[db] Base '{settings.DB_NAME}' creada")
+
+    connection = _connection(with_database=True)
+    try:
+        tables = _table_names_from(connection)
+        has_schema = "roles" in tables
+
+        if reset or not has_schema:
+            _run_sql_file(connection, SCHEMA_PATH)
+        else:
+            missing = CORE_TABLES - tables
+            if missing:
+                raise SystemExit(
+                    "La base existe pero faltan tablas: "
+                    + ", ".join(sorted(missing))
+                    + "\nUsa --reset para recrear el esquema (destructivo)."
+                )
+            print("[sql] Esquema existente: no se ejecuta schema.sql")
+
+        _apply_migrations(connection)
+
+        if no_demo:
+            print("[demo] Omitido por --no-demo")
+        else:
+            _run_sql_file(connection, DEMO_PATH)
+    finally:
+        connection.close()
+
+    apply_seed(reset_passwords, args)
+
+    print()
+    print("Listo. Siguiente paso:")
+    print("  iniciar_api.bat")
+    print()
+    print("Web móvil: http://127.0.0.1:8000/app/")
+    print("API docs:  http://127.0.0.1:8000/docs")
+    return 0
+
+
+def _table_names_from(connection) -> set[str]:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT table_name AS nombre
+              FROM information_schema.tables
+             WHERE table_schema = %s
+            """,
+            (settings.DB_NAME,),
+        )
+        return {row["nombre"] for row in cursor.fetchall()}
+
+
+# ---------------------------------------------------------------------------
 # Listado y verificación
 # ---------------------------------------------------------------------------
 
@@ -735,7 +1004,7 @@ def list_state() -> int:
         """
     )
     if not usuarios:
-        print("  (ninguno; ejecuta --apply)")
+        print("  (ninguno; ejecuta init_db.py)")
     for row in usuarios:
         estado = "activo" if row["activo"] else "inactivo"
         print(f"  {row['username']:<16} {row['rol']:<16} {estado:<9} {row['nombre']}")
@@ -748,22 +1017,31 @@ def check_connection() -> int:
     print(f"APP_ENV: {settings.APP_ENV}")
     print(f"SECRET_KEY: {'configurada' if settings.SECRET_KEY else 'NO configurada'}")
 
-    row = db.ping()
-    print(f"ping: {row}")
-
-    tablas = db.fetch_all(
-        """
-        SELECT table_name AS nombre
-          FROM information_schema.tables
-         WHERE table_schema = %s
-         ORDER BY table_name
-        """,
-        (settings.DB_NAME,),
-    )
-    print(f"Tablas: {len(tablas)}")
-    if not any(t["nombre"] == "rol_permisos" for t in tablas):
-        print("\nAVISO: falta 'rol_permisos'. Ejecuta la migración 001.")
+    if not _database_exists():
+        print(f"\n[ERROR] La base '{settings.DB_NAME}' no existe.")
+        print("Ejecuta: api\\.venv\\Scripts\\python.exe scripts\\init_db.py")
         return 1
+
+    connection = _connection(with_database=True)
+    try:
+        tables = _table_names_from(connection)
+    finally:
+        connection.close()
+
+    print(f"Tablas: {len(tables)}")
+
+    missing = CORE_TABLES - tables
+    if missing:
+        print("\n[ERROR] Faltan tablas: " + ", ".join(sorted(missing)))
+        print("Ejecuta init_db.py o usa --reset si el esquema está corrupto.")
+        return 1
+
+    if "rol_permisos" not in tables:
+        print("\n[ERROR] Falta 'rol_permisos'.")
+        print("Ejecuta init_db.py para aplicar las migraciones.")
+        return 1
+
+    print("Estado: OK")
     return 0
 
 
@@ -773,21 +1051,32 @@ def check_connection() -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Seeder seguro de roles, permisos y usuarios de Haydeén Sistema.",
+        description=(
+            "Inicializa Haydeén Sistema: .env, base de datos, esquema, "
+            "migraciones, demo, roles y usuarios."
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Ejemplos:\n"
+            "  api\\.venv\\Scripts\\python.exe scripts\\init_db.py\n"
+            "  api\\.venv\\Scripts\\python.exe scripts\\init_db.py --check\n"
+            "  api\\.venv\\Scripts\\python.exe scripts\\init_db.py --reset\n"
+            "  api\\.venv\\Scripts\\python.exe scripts\\init_db.py --export-seed\n"
+        ),
     )
-    parser.add_argument("--apply", action="store_true", help="Crea/actualiza roles, permisos y usuarios.")
+    parser.add_argument("--reset", action="store_true", help="Recrea el esquema (destructivo).")
+    parser.add_argument("--no-demo", action="store_true", help="No carga database/demo_data.sql.")
     parser.add_argument(
         "--reset-passwords",
         action="store_true",
-        help="Rota la contraseña de usuarios existentes (con --apply).",
+        help="Rota las contraseñas de los usuarios existentes.",
     )
     parser.add_argument(
         "--export-seed",
         nargs="?",
         const=str(DEFAULT_EXPORT),
         metavar="RUTA",
-        help=f"Exporta seed JSON anonimizado (por defecto: {DEFAULT_EXPORT}).",
+        help=f"Exporta un seed JSON anonimizado (por defecto: {DEFAULT_EXPORT}).",
     )
     parser.add_argument(
         "--import-seed",
@@ -797,17 +1086,44 @@ def build_parser() -> argparse.ArgumentParser:
         help="Importa un seed JSON generado con --export-seed.",
     )
     parser.add_argument("--list", action="store_true", help="Muestra roles, permisos y usuarios.")
-    parser.add_argument("--check", action="store_true", help="Verifica conexión y tablas.")
+    parser.add_argument("--check", action="store_true", help="Verifica conexión, base y tablas.")
 
     for user in USERS:
         parser.add_argument(
             f"--password-{user['arg']}",
             dest=f"password_{user['arg']}",
             metavar="CLAVE",
-            help=f"Contraseña inicial de '{user['username']}' (mín. {MIN_PASSWORD_LENGTH} caracteres).",
+            help=(
+                f"Contraseña inicial de '{user['username']}' "
+                f"(mín. {MIN_PASSWORD_LENGTH} caracteres)."
+            ),
         )
 
     return parser
+
+
+def _print_error(exc: BaseException) -> None:
+    print("\n" + "=" * 68, file=sys.stderr)
+    print(" ERROR", file=sys.stderr)
+    print("=" * 68, file=sys.stderr)
+    print(f"Tipo: {type(exc).__name__}", file=sys.stderr)
+    print(f"Detalle: {exc}", file=sys.stderr)
+
+    try:
+        import pymysql  # noqa: PLC0415
+
+        if isinstance(exc, pymysql.err.OperationalError):
+            print("\nNo se pudo conectar a MySQL.", file=sys.stderr)
+            if settings is not None:
+                print(f"Host: {settings.DB_HOST}:{settings.DB_PORT}", file=sys.stderr)
+                print(f"Usuario: {settings.DB_USER}", file=sys.stderr)
+                print(f"Base: {settings.DB_NAME}", file=sys.stderr)
+            print("Revisa que Laragon esté encendido y que api\\.env sea correcto.", file=sys.stderr)
+    except ImportError:
+        pass
+
+    print("\nTraza completa:", file=sys.stderr)
+    traceback.print_exc()
 
 
 def main() -> int:
@@ -815,18 +1131,17 @@ def main() -> int:
     args = parser.parse_args()
 
     actions = [
-        args.apply,
+        args.check,
+        args.list,
         args.export_seed is not None,
         args.import_seed is not None,
-        args.list,
-        args.check,
     ]
-    if not any(actions):
-        parser.print_help()
-        print("\nIndica al menos una acción: --apply, --export-seed, --import-seed, --list o --check.")
-        return 2
+    if sum(bool(action) for action in actions) > 1:
+        parser.error("Usa solo una acción: --check, --list, --export-seed o --import-seed.")
 
     try:
+        bootstrap()
+
         if args.check:
             return check_connection()
         if args.list:
@@ -835,17 +1150,21 @@ def main() -> int:
             return export_seed(Path(args.export_seed))
         if args.import_seed is not None:
             return import_seed(Path(args.import_seed))
-        if args.apply:
-            return apply_seed(args.reset_passwords, args)
-    except Exception as exc:
-        print(f"\nERROR: {exc}", file=sys.stderr)
-        print(
-            "Verifica que MySQL esté activo en Laragon y que api/.env sea correcto.",
-            file=sys.stderr,
-        )
-        return 1
 
-    return 0
+        return initialize(
+            reset=args.reset,
+            no_demo=args.no_demo,
+            reset_passwords=args.reset_passwords,
+            args=args,
+        )
+    except KeyboardInterrupt:
+        print("\nCancelado.", file=sys.stderr)
+        return 130
+    except SystemExit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        _print_error(exc)
+        return 1
 
 
 if __name__ == "__main__":
